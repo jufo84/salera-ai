@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+bcrypt
+pyyaml
+requests
+beautifulsoup4
+duckduckgo-search
+chardet
+PyPDF2
+python-docx
+sentence-transformers
+faiss-cpu

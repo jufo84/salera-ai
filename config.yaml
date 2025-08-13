@@ -1,0 +1,33 @@
+# Allgemeine Einstellungen
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+# KI-Modelle
+models:
+  text_model: "local-german-model"  # Name deines Textmodells
+  speech_model: "piper"             # Für Sprachsynthese
+  speech_recognition: "whisper"     # Für Spracheingabe
+
+# Websuche aktivieren/deaktivieren
+web_search:
+  enabled: true
+  max_results: 5
+
+# Dokumentenverarbeitung
+docs:
+  folder: "./docs"
+  index_file: "./memory/docs_index.faiss"
+
+# Gedächtnis
+memory:
+  folder: "./memory"
+  max_entries_per_user: 1000
+
+# Benutzerverwaltung
+users_file: "./users.json"
+
+# UI
+ui:
+  dark_mode_auto: true      # Passt Dark/Light automatisch an OS an
+  mobile_optimized: true    # Optimiert UI für Handy/Tablet

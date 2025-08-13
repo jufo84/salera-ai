@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salera AI</title>
+<link id="theme-link" rel="stylesheet" href="style-light.css">
+<style>
+body { font-family: Arial, sans-serif; margin:0; padding:0; }
+header { padding: 1rem; background: #0077cc; color: white; text-align: center; }
+main { padding: 1rem; }
+.hidden { display: none; }
+button { padding: 0.5rem 1rem; margin:0.2rem; cursor: pointer; }
+input, textarea { width: 100%; padding: 0.5rem; margin: 0.5rem 0; }
+@media (max-width: 600px) { main { padding:0.5rem; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Salera AI</h1>
+</header>
+
+<main>
+  <div id="login-div">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Benutzername">
+    <input type="password" id="password" placeholder="Passwort">
+    <button onclick="login()">Login</button>
+    <p id="login-msg"></p>
+  </div>
+
+  <div id="app-div" class="hidden">
+    <p id="welcome-msg"></p>
+
+    <h3>Gedächtnis</h3>
+    <textarea id="memory-entry" placeholder="Neuer Eintrag..."></textarea>
+    <button onclick="addMemory()">Hinzufügen</button>
+    <input type="text" id="memory-search" placeholder="Suche im Gedächtnis">
+    <button onclick="searchMemory()">Suchen</button>
+    <ul id="memory-results"></ul>
+
+    <h3>Dokumente</h3>
+    <input type="file" id="doc-file">
+    <button onclick="uploadDoc()">Hochladen</button>
+    <input type="text" id="doc-search" placeholder="Suche in Dokumenten">
+    <button onclick="searchDocs()">Suchen</button>
+    <ul id="doc-results"></ul>
+
+    <h3>Websuche</h3>
+    <input type="text" id="web-search" placeholder="Suche im Web">
+    <button onclick="searchWeb()">Suchen</button>
+    <ul id="web-results"></ul>
+  </div>
+</main>
+
+<!-- Direkt unter <main> einfügen -->
+<div id="avatar-div" class="hidden">
+  <h3>Avatar</h3>
+  <canvas id="avatar-canvas" style="width:100%; height:400px;"></canvas>
+  <textarea id="avatar-chat" placeholder="Sag etwas zum Avatar..."></textarea>
+  <button onclick="sendAvatarMessage()">Senden</button>
+</div>
+
+<script>
+let authHeader = "";
+
+function detectDarkMode() {
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.getElementById('theme-link').href = prefersDark ? 'style-dark.css' : 'style-light.css';
+}
+
+detectDarkMode();
+
+function login() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+  authHeader = "Basic " + btoa(username + ":" + password);
+  fetch("/api/me", { headers: { "Authorization": authHeader } })
+    .then(res => {
+      if(res.status==200) return res.json();
+      else throw new Error("Login fehlgeschlagen");
+    })
+    .then(data => {
+      document.getElementById("login-div").classList.add("hidden");
+      document.getElementById("app-div").classList.remove("hidden");
+      document.getElementById("welcome-msg").innerText = "Willkommen, " + data.username + " (" + data.role + ")";
+    })
+    .catch(err => { document.getElementById("login-msg").innerText = err.message; });
+}
+
+// Gedächtnis
+function addMemory() {
+  const entry = document.getElementById("memory-entry").value;
+  fetch("/api/memory/add", {
+    method: "POST",
+    headers: { "Authorization": authHeader, "Content-Type":"application/x-www-form-urlencoded" },
+    body: "entry=" + encodeURIComponent(entry)
+  }).then(res => res.json()).then(data => {
+    alert("Eintrag hinzugefügt");
+  });
+}
+
+function searchMemory() {
+  const query = document.getElementById("memory-search").value;
+  fetch("/api/memory/search?query=" + encodeURIComponent(query), {
+    headers: { "Authorization": authHeader }
+  }).then(res=>res.json()).then(data=>{
+    const ul = document.getElementById("memory-results");
+    ul.innerHTML="";
+    data.results.forEach(r => {
+      const li = document.createElement("li"); li.innerText=r; ul.appendChild(li);
+    });
+  });
+}
+
+// Dokumente
+function uploadDoc() {
+  const file = document.getElementById("doc-file").files[0];
+  const formData = new FormData();
+  formData.append("file", file);
+  fetch("/api/docs/upload", { method:"POST", body: formData, headers:{ "Authorization": authHeader } })
+    .then(res=>res.json()).then(data=> alert("Dokument hochgeladen: "+data.filename));
+}
+
+function searchDocs() {
+  const query = document.getElementById("doc-search").value;
+  fetch("/api/docs/search?query=" + encodeURIComponent(query), { headers:{ "Authorization": authHeader } })
+    .then(res=>res.json()).then(data=>{
+      const ul = document.getElementById("doc-results");
+      ul.innerHTML="";
+      data.results.forEach(r=>{
+        const li=document.createElement("li");
+        li.innerText = r.filename + ": " + r.text.substring(0,100)+"...";
+        ul.appendChild(li);
+      });
+    });
+}
+
+// Websuche
+function searchWeb() {
+  const query = document.getElementById("web-search").value;
+  fetch("/api/websearch?query="+encodeURIComponent(query), { headers:{ "Authorization": authHeader } })
+    .then(res=>res.json()).then(data=>{
+      const ul = document.getElementById("web-results");
+      ul.innerHTML="";
+      data.results.forEach(r=>{
+        const li = document.createElement("li");
+        li.innerHTML = `<a href="${r.href}" target="_blank">${r.title}</a>`;
+        ul.appendChild(li);
+      });
+    });
+}
+</script>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<script>
+let scene, camera, renderer, avatar, mixer, clock;
+
+function initAvatar() {
+  const canvas = document.getElementById("avatar-canvas");
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+
+  const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+  scene.add(light);
+
+  const loader = new THREE.GLTFLoader();
+  loader.load('avatar.glb', function(gltf) {
+    avatar = gltf.scene;
+    scene.add(avatar);
+    mixer = new THREE.AnimationMixer(avatar);
+    if(gltf.animations.length > 0) {
+      const action = mixer.clipAction(gltf.animations[0]);
+      action.play();
+    }
+  });
+
+  camera.position.set(0, 1.6, 3);
+  clock = new THREE.Clock();
+  animateAvatar();
+}
+
+function animateAvatar() {
+  requestAnimationFrame(animateAvatar);
+  if(mixer) mixer.update(clock.getDelta());
+  renderer.render(scene, camera);
+}
+
+function sendAvatarMessage() {
+  const msg = document.getElementById("avatar-chat").value;
+  fetch("/api/avatar-chat", {
+    method:"POST",
+    headers: { "Authorization": authHeader, "Content-Type":"application/json" },
+    body: JSON.stringify({ message: msg })
+  }).then(res=>res.json()).then(data=>{
+    alert("AI sagt: " + data.reply);
+    // Optional: hier kann man Animationsreaktionen des Avatars triggern
+  });
+}
+
+// Avatar aktivieren sobald App geladen
+document.getElementById("app-div").addEventListener("transitionend", () => {
+  document.getElementById("avatar-div").classList.remove("hidden");
+  initAvatar();
+});
+</script>
+
+</html>
